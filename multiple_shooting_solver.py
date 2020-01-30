@@ -18,6 +18,7 @@ def multiple_shooting_solver():
     # construct the bvp-dae problem
     # obtain the initial input
     bvp_dae = bvp_problem.BvpDae()
+    success_flag = 0
     size_y = bvp_dae.size_y
     size_z = bvp_dae.size_z
     size_p = bvp_dae.size_p
@@ -144,6 +145,7 @@ def multiple_shooting_solver():
             break
         print("\tLTE = {}. Number of nodes = {}".format(np.amax(d_lte), N))
         if alpha <= alpha_m:
+            success_flag = 1
             print("Final solution is found, alpha = {}. Number of nodes: {}".format(alpha, N))
             break
         alpha *= beta
@@ -170,7 +172,7 @@ def multiple_shooting_solver():
             f.write("{} solved successfully. alpha = {}.\n".format(example_name, alpha))
         else:
             f.write("{} solved unsuccessfully. alpha = {}.\n".format(example_name, alpha))
-    if alpha <= alpha_m:
+    if alpha <= alpha_m and success_flag:
         # write and plot the result only when problem is solved successfully.
         # write solution to the output file
         error = bvpdae_write_data(output_file, N, size_y, size_z, size_p, t_span, y0, z0, para0)
