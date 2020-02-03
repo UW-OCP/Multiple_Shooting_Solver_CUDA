@@ -34,6 +34,47 @@ def compute_residual_parallel(N, stages, size_y, size_z, size_p, t_span, y0, z0,
     return f_s, d_b, b_n, d_lte
 
 
+def compute_residual_parallel_gpu(N, stages, size_y, size_z, size_p, t_span, y0, z0, p, alpha0, rk, tol):
+    d_x_next, d_lte = dae_integration_parallel(N, stages, size_y, size_z, size_p, t_span, y0, z0, p, alpha0, rk, tol)
+    # copy lte back to CPU
+    d_lte = d_lte.copy_to_host()
+    d_g, d_g_N = compute_dae_parallel(N, size_y, size_z, size_p, y0, z0, p, alpha0)
+    d_g_N = d_g_N.copy_to_host()
+    # compute the boundary conditions
+    r_bc = np.zeros((size_y + size_p), dtype=np.float64)
+    # this boundary function is currently on CPU
+    _abvp_r(y0[0, 0: size_y], y0[N - 1, 0: size_y], p, r_bc)
+    b_n = np.concatenate([-d_g_N[0: size_z], -r_bc])
+    # copy to GPU for kernel function
+    d_y0 = cuda.to_device(y0)
+    d_b_n = cuda.to_device(b_n)
+    # holder for the output
+    d_b = cuda.device_array((N - 1, size_z + size_y))
+    d_f_s = cuda.device_array((N * (size_z + size_y) + size_p, ), dtype=np.float64)
+    # warp dimension for CUDA kernel
+    grid_dims = (N + TPB - 1) // TPB
+    compute_residual_kernel[grid_dims, TPB](N, size_y, size_z, size_p, d_g, d_x_next, d_y0, d_b_n, d_b, d_f_s)
+    norm_d_f_s = cuda_infinity_norm(d_f_s)
+    return norm_d_f_s, d_b, b_n, d_lte
+
+
+@cuda.jit
+def compute_residual_kernel(N, size_y, size_z, size_p, d_g, d_x_next, d_y0, d_b_n, d_b, d_f_s):
+    # compute the residual at each time node
+    # cuda thread index
+    i = cuda.grid(1)
+    if i < N - 1:
+        for j in range(size_z):
+            d_b[i, j] = -d_g[i, j]
+            d_f_s[i * (size_y + size_z) + j] = -d_b[i, j]
+        for j in range(size_y):
+            d_b[i, size_z + j] = -(d_x_next[i, j] - d_y0[i + 1, j])
+            d_f_s[i * (size_y + size_z) + size_z + j] = -d_b[i, size_z + j]
+    elif i == N - 1:
+        for j in range(size_y + size_z + size_p):
+            d_f_s[(N - 1) * (size_y + size_z) + j] = -d_b_n[j]
+
+
 def dae_integration_parallel(N, stages, size_y, size_z, size_p, t_span, y0, z0, p, alpha0, rk, tol):
     # warp dimension for CUDA kernel
     grid_dims = (N + TPB - 1) // TPB
@@ -86,7 +127,8 @@ def dae_integration_parallel(N, stages, size_y, size_z, size_p, t_span, y0, z0, 
                                                d_sum1, d_sum2, d_sum3, d_sum4, d_W_sum2, d_error_sum,
                                                d_sigma, d_fac,
                                                d_x_next, d_lte)
-    return d_x_next.copy_to_host(), d_lte.copy_to_host()
+    # return d_x_next.copy_to_host(), d_lte.copy_to_host()
+    return d_x_next, d_lte
 
 
 @cuda.jit
@@ -327,6 +369,13 @@ def dae_integration_row(stages, size_y, size_z, size_p, alpha, delta, d_y0, d_z0
     return
 
 
+"""
+    Return:
+        d_g: on GPU
+        d_g_N: on CPU
+"""
+
+
 def compute_dae_parallel(N, size_y, size_z, size_p, y0, z0, p, alpha0):
     # warp dimension for CUDA kernel
     grid_dims = (N + TPB - 1) // TPB
@@ -336,14 +385,29 @@ def compute_dae_parallel(N, size_y, size_z, size_p, y0, z0, p, alpha0):
     d_p = cuda.to_device(p)
     # create holder for output
     d_g = cuda.device_array((N, size_z), dtype=np.float64)
-    compute_dae_kernel[grid_dims, TPB](N, size_y, size_z, size_p, d_y0, d_z0, d_p, alpha0, d_g)
-    return d_g.copy_to_host()
+    d_g_N = cuda.device_array((size_z, ), dtype=np.float64)
+    compute_dae_kernel[grid_dims, TPB](N, size_y, size_z, size_p, d_y0, d_z0, d_p, alpha0, d_g, d_g_N)
+    # return d_g.copy_to_host()
+    return d_g, d_g_N
 
 
 @cuda.jit
-def compute_dae_kernel(N, size_y, size_z, size_p, d_y0, d_z0, d_p, alpha0, d_g):
+def compute_dae_kernel(N, size_y, size_z, size_p, d_y0, d_z0, d_p, alpha0, d_g, d_g_N):
     # cuda thread index
     i = cuda.grid(1)
-    if i < N:
+    if i < N - 1:
         _abvp_g(d_y0[i, 0: size_y], d_z0[i, 0: size_z], d_p, alpha0,
                 d_g[i, 0: size_z])
+    elif i == N - 1:
+        _abvp_g(d_y0[i, 0: size_y], d_z0[i, 0: size_z], d_p, alpha0,
+                d_g[i, 0: size_z])
+        _abvp_g(d_y0[i, 0: size_y], d_z0[i, 0: size_z], d_p, alpha0,
+                d_g_N[0: size_z])
+
+
+"""
+Use @reduce decorator for converting a simple binary operation into a reduction kernel.
+"""
+@cuda.reduce
+def cuda_infinity_norm(a, b):
+    return max(a, b)

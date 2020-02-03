@@ -90,7 +90,7 @@ TPB = 32
 '''
 
 
-def partition_factorization_parallel(size_y, size_p, M, N, A, C, H, b):
+def partition_factorization_parallel(size_y, size_p, M, N, d_A, d_C, d_H, d_b):
     # compute the grid dimension of the warp
     grid_dims = (M + TPB - 1) // TPB
     # number of partitions to use: M
@@ -106,10 +106,11 @@ def partition_factorization_parallel(size_y, size_p, M, N, A, C, H, b):
     index = np.array(indices)
     # transfer the memory from CPU to GPU
     d_index = cuda.to_device(index)
-    d_A = cuda.to_device(A)
-    d_C = cuda.to_device(C)
-    d_H = cuda.to_device(H)
-    d_b = cuda.to_device(b)
+    # d_A = cuda.to_device(A)
+    # d_C = cuda.to_device(C)
+    # d_H = cuda.to_device(H)
+    # d_b = cuda.to_device(b)
+
     # holders for each intermediate matrix
     d_q = cuda.device_array(((N - 1) * 2 * size_y, 2 * size_y), dtype=np.float64)
     d_q_t = cuda.device_array(((N - 1) * 2 * size_y, 2 * size_y), dtype=np.float64)

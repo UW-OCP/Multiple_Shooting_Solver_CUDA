@@ -9,6 +9,17 @@ import matrix_factorization_cuda
 TPB = 32
 
 
+"""
+Return value:
+    d_A: on GPU
+    d_C: on GPU
+    d_H: on GPU
+    B_0: on CPU
+    B_n: on CPU
+    H_n: on CPU
+"""
+
+
 def construct_jacobian_parallel(N, stages, size_y, size_z, size_p, t_span, y0, z0, p, alpha0, rk):
     # warp dimension for CUDA kernel
     grid_dims = ((N - 1) + TPB - 1) // TPB
@@ -47,7 +58,8 @@ def construct_jacobian_parallel(N, stages, size_y, size_z, size_p, t_span, y0, z
     H_n[size_z: size_z + size_y + size_p, 0: size_p] = \
         d_r[0: size_y + size_p, size_y + size_y: size_y + size_y + size_p]
 
-    return d_A.copy_to_host(), d_C.copy_to_host(), d_H.copy_to_host(), B_0, B_n, H_n
+    # return d_A.copy_to_host(), d_C.copy_to_host(), d_H.copy_to_host(), B_0, B_n, H_n
+    return d_A, d_C, d_H, B_0, B_n, H_n
 
 
 @cuda.jit

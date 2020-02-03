@@ -2,7 +2,7 @@ import bvp_problem
 import rk_coefficients
 import numpy as np
 from construct_jacobian_parallel import construct_jacobian_parallel
-from compute_residual_parallel import compute_residual_parallel
+from compute_residual_parallel import compute_residual_parallel, compute_residual_parallel_gpu
 from solve_babd_system import partition_factorization_parallel, construct_babd_mshoot, qr_decomposition, \
     backward_substitution, partition_backward_substitution_parallel, recover_babd_solution
 from line_search_parallel import line_search_ms
@@ -52,6 +52,7 @@ def multiple_shooting_solver():
 
     para0 = np.copy(p0)
     t_span = np.copy(t_span0)
+    success_flag = 1
 
     # benchmark data
     N_residual = 0
@@ -76,11 +77,10 @@ def multiple_shooting_solver():
             N_Jacobian += 1
             start_time_residual = time.time()
             # compute the residual
-            f_s, d_b, b_n, d_lte = compute_residual_parallel(
+            norm_f_s, d_b, b_n, d_lte = compute_residual_parallel_gpu(
                 N, stages, size_y, size_z, size_p, t_span, y0, z0, para0, alpha, rk, tol)
             T_residual += (time.time() - start_time_residual)
             N_residual += 1
-            norm_f_s = np.linalg.norm(f_s, np.inf)
             if norm_f_s < tol:
                 print('alpha = {}, solution is found. Number of nodes: {}'.format(alpha, N))
                 break
@@ -108,7 +108,7 @@ def multiple_shooting_solver():
                 print("\tSearch direction is not right, remeshed the problem. Number of nodes = {}".format(N))
                 mesh_it += 1
                 mesh_sanit_check(N, mesh_it, max_mesh, max_nodes, min_nodes)
-                if N > 6000 or mesh_it > 20 or N < min_nodes:
+                if N > 10000 or mesh_it > 20 or N < min_nodes:
                     break
             else:
                 # perform line search to find the direction
@@ -122,30 +122,29 @@ def multiple_shooting_solver():
                     print("\tLine search failed. Remeshed the problem. Number of nodes = {}".format(N))
                     mesh_it += 1
                     mesh_sanit_check(N, mesh_it, max_mesh, max_nodes, min_nodes)
-                    if N > 6000 or mesh_it > 20 or N < min_nodes:
+                    if N > 10000 or mesh_it > 20 or N < min_nodes:
+                        success_flag = 0
                         break
-        if newton_iter >= (max_iter - 1) or N > 6000 or mesh_it > 20 or N < min_nodes:
+        if newton_iter >= (max_iter - 1) or N > 10000 or mesh_it > 20 or N < min_nodes:
             print("alpha = {}, reach the maximum iteration numbers and the problem does not converge!".format(alpha))
+            success_flag = 0
             break
         while np.amax(d_lte) > 1:
             N, t_span, y0, z0 = mesh_refinement(N, size_y, size_z, tol, d_lte, t_span, y0, z0)
             print("\tLTE = {}. Remeshed the problem. Number of nodes = {}".format(np.amax(d_lte), N))
             mesh_it += 1
             mesh_sanit_check(N, mesh_it, max_mesh, max_nodes, min_nodes)
-            if N > 6000 or mesh_it > 20 or N < min_nodes:
+            if N > 10000 or mesh_it > 20 or N < min_nodes:
+                success_flag = 0
                 break
             start_time_residual = time.time()
-            # compute the residual
-            _, _, _, d_lte = compute_residual_parallel(
+            # compute the residuaDo
+            _, _, _, d_lte = compute_residual_parallel_gpu(
                 N, stages, size_y, size_z, size_p, t_span, y0, z0, para0, alpha, rk, tol)
             T_residual += (time.time() - start_time_residual)
             N_residual += 1
-        if newton_iter >= (max_iter - 1) or N > 6000 or mesh_it > 20 or N < min_nodes:
-            print("alpha = {}, reach the maximum iteration numbers and the problem does not converge!".format(alpha))
-            break
-        print("\tLTE = {}. Number of nodes = {}".format(np.amax(d_lte), N))
+        print("\tAlpha = {}, solution is found with LTE = {}. Number of nodes = {}".format(alpha, np.amax(d_lte), N))
         if alpha <= alpha_m:
-            success_flag = 1
             print("Final solution is found, alpha = {}. Number of nodes: {}".format(alpha, N))
             break
         alpha *= beta
@@ -168,7 +167,7 @@ def multiple_shooting_solver():
         f.write("Running time of solver: {}\n".format(solver_elapsed_time))
     # record the solved example
     with open('test_results.txt', 'a') as f:
-        if alpha <= alpha_m:
+        if alpha <= alpha_m and success_flag:
             f.write("{} solved successfully. alpha = {}.\n".format(example_name, alpha))
         else:
             f.write("{} solved unsuccessfully. alpha = {}.\n".format(example_name, alpha))
