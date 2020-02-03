@@ -156,6 +156,7 @@ OutputFile = "ex22.data";
 The fileds with the check sign are must-included fields in the file while other fileds are optional fields depending on the problem.
 **All the necessary field lines must end up with a semicolon.**
 The definition of the fields need not to be in one line as long as they are embraced by brackets.
+**Some example OCP files can be found at the repo "ocp_test_problems".**
 
 ## About the solver
 
