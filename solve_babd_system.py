@@ -124,7 +124,7 @@ def partition_factorization_parallel(size_y, size_p, M, N, d_A, d_C, d_H, d_b):
     d_b_tilde = cuda.device_array(((N - 1), size_y), dtype=np.float64)
     # holders for output variables
     d_E = cuda.device_array(((N - 1) * size_y, size_y), dtype=np.float64)
-    d_J = cuda.device_array(((N - 1) * size_y, size_y), dtype=np.float64)
+    d_J = cuda.device_array(((N - 1) * size_y, size_p), dtype=np.float64)
     d_G = cuda.device_array(((N - 1) * size_y, size_y), dtype=np.float64)
     d_d = cuda.device_array(((N - 1), size_y), dtype=np.float64)
     d_A_tilde_r_end = cuda.device_array((M * size_y, size_y), dtype=np.float64)
