@@ -39,7 +39,7 @@ def multiple_shooting_solver():
     max_line_search = 20
     output_file = bvp_dae.output_file
     alpha = 1  # continuation parameter
-    if size_inequality > 0 or size_sv_inequality > 0 :
+    if size_inequality > 0 or size_sv_inequality > 0:
         alpha_m = 1e-6
     else:
         alpha_m = 1
@@ -177,7 +177,7 @@ def multiple_shooting_solver():
         error = bvpdae_write_data(output_file, N, size_y, size_z, size_p, t_span, y0, z0, para0)
         if error != 0:
             print("Write file failed.")
-        # plot_result(size_y, size_z, t_span, y0, z0)
+        plot_result(size_y, size_z, t_span, y0, z0)
 
 
 if __name__ == '__main__':
