@@ -410,4 +410,4 @@ Use @reduce decorator for converting a simple binary operation into a reduction 
 """
 @cuda.reduce
 def cuda_infinity_norm(a, b):
-    return max(a, b)
+    return max(abs(a), abs(b))

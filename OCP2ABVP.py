@@ -95,9 +95,10 @@ class OCP(object):
         H = self.L
         for i in range(len(o.x)):
             H = H + y[nx+i]*o.f[i]
-        # second order necessary condition term
-        for i in range(len(o.u)):
-            H = H + _alpha * o.u[i] * o.u[i] / 2
+        # # second order necessary condition term
+        # if nd > 0 or ns > 0:
+        #     for i in range(len(o.u)):
+        #         H = H + _alpha * o.u[i] * o.u[i] / 2
         for i in range(len(o.c)):
             H = H + z[nu+i]*o.c[i]
         for i in range(len(o.d)):
@@ -682,7 +683,8 @@ def substitute_variable(rawline, contain_variable, variable_set, variable_dict):
                         if rawline[ii] == variable[0]:
                             if rawline[ii: ii + len(variable)] == variable and \
                                     (ii + len(variable) >= len(rawline) or
-                                     (not rawline[ii + len(variable)].isalnum())):
+                                     (not rawline[ii + len(variable)].isalnum())) and \
+                                    (ii == 0 or (not rawline[ii - 1].isalnum())):
                                 rawline = rawline[0: ii] + variable_dict[variable] + \
                                           rawline[ii + len(variable):]
                                 ii += len(variable)
@@ -711,15 +713,19 @@ def clean_variable_dict(variable_set, variable_dict):
 
 def substitute_key(cur_variable, variable_set, variable_dict):
     for variable in variable_set:
-        if cur_variable in variable_dict:
+        if cur_variable in variable_dict and cur_variable != variable:
             cur_key = variable_dict[cur_variable]
             if cur_key.find(variable) >= 0:
                 ii = 0
                 while ii + len(variable) < len(variable_dict[cur_variable]):
                     if variable_dict[cur_variable][ii] == variable[0]:
+                        # make sure the character before and after are not letter or numbers
+                        # so that the  varaible is the real variable alone
                         if variable_dict[cur_variable][ii: ii + len(variable)] == variable and (
                                 ii + len(variable) >= len(variable_dict[cur_variable]) or (
-                                not variable_dict[cur_variable][ii + len(variable)].isalnum())):
+                                not variable_dict[cur_variable][ii + len(variable)].isalnum())) and (
+                                ii == 0 or (
+                                not variable_dict[cur_variable][ii - 1].isalnum())):
                             substitute_key(variable, variable_set, variable_dict)
                             new_key = variable_dict[cur_variable].replace(variable, variable_dict[variable])
                             variable_dict[cur_variable] = new_key

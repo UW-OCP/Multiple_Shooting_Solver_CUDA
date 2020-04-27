@@ -48,7 +48,7 @@ def multiple_shooting_solver():
     m = 3  # number of collocation points
     rk = rk_coefficients.RKCoefficients(flag=1)
     stages = rk.stages
-    M = 4  # number of blocks used to solve the BABD system in parallel
+    M = 32  # number of blocks used to solve the BABD system in parallel
 
     para0 = np.copy(p0)
     t_span = np.copy(t_span0)
