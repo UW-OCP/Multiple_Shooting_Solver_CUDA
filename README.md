@@ -33,7 +33,7 @@ sudo apt-get install build-essential freeglut3-dev libxmu-dev libxi-dev git cmak
 
 The solver can be used with the command in terminal as
 ```bash
-./runsh ocp_example
+./run.sh ocp_example
 ```
 The input `ocp_example` is a plain text file with the optimal control problem (OCP) to be solved defined with necessary fields for the solver. 
 The necessary fields for the OCP are 
